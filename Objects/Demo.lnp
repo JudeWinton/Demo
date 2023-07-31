@@ -1,0 +1,13 @@
+".\Objects\main.obj",
+".\Objects\fw_adc.obj",
+".\Objects\fw_i2c.obj",
+".\Objects\fw_mem.obj",
+".\Objects\fw_spi.obj",
+".\Objects\fw_sys.obj",
+".\Objects\fw_tim.obj",
+".\Objects\fw_uart.obj",
+".\Objects\fw_usb.obj",
+".\Objects\fw_util.obj" 
+TO ".\Objects\Demo" 
+
+PRINT(".\Listings\Demo.map") REMOVEUNUSED 

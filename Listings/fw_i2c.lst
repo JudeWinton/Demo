@@ -1,0 +1,155 @@
+C51 COMPILER V9.60.7.0   FW_I2C                                                            07/31/2023 14:33:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE FW_I2C
+OBJECT MODULE PLACED IN .\Objects\fw_i2c.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\fw_i2c.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\include) DEBUG
+                    - PRINT(.\Listings\fw_i2c.lst) OBJECT(.\Objects\fw_i2c.obj)
+
+line level    source
+
+   1          #include "fw_i2c.h"
+   2          
+   3          // 定义I2C写入函数
+   4          // devAddr: 设备地址
+   5          // memAddr: 存储器地址
+   6          // dat: 数据
+   7          // size: 数据大小
+   8          uint8_t I2C_Write(uint8_t devAddr, uint8_t memAddr, uint8_t *dat, uint16_t size)
+   9          {
+  10   1          SFRX_ON();  // 打开特殊功能寄存器的交换功能
+  11   1          I2C_MasterStart();  // I2C主设备启动信号
+  12   1          I2C_MasterSendData(devAddr & 0xFE);  // 发送设备地址
+  13   1          I2C_MasterRxAck();  // 接收应答信号
+  14   1          I2C_MasterSendData(memAddr);  // 发送存储器地址
+  15   1          I2C_MasterRxAck();  // 接收应答信号
+  16   1          while(size--)  // 循环发送数据
+  17   1          {
+  18   2              I2C_MasterSendData(*dat++);  // 发送数据
+  19   2              I2C_MasterRxAck();  // 接收应答信号
+  20   2          }
+  21   1          I2C_MasterStop();  // I2C主设备停止信号
+  22   1          SFRX_OFF();  // 关闭特殊功能寄存器的交换功能
+  23   1          return HAL_OK;  // 返回操作成功状态
+  24   1      }
+  25          
+  26          // 定义I2C读取函数
+  27          // devAddr: 设备地址
+  28          // memAddr: 存储器地址
+  29          // buf: 数据缓存
+  30          // size: 数据大小
+  31          uint8_t I2C_Read(uint8_t devAddr, uint8_t memAddr, uint8_t *buf, uint16_t size)
+  32          {
+  33   1          SFRX_ON();  // 打开特殊功能寄存器的交换功能
+  34   1          I2C_MasterStart();  // I2C主设备启动信号
+  35   1          I2C_MasterSendData(devAddr & 0xFE);  // 发送设备地址
+  36   1          I2C_MasterRxAck();  // 接收应答信号
+  37   1          I2C_MasterSendData(memAddr);  // 发送存储器地址
+  38   1          I2C_MasterRxAck();  // 接收应答信号
+  39   1          I2C_MasterStart();  // I2C主设备再次启动信号，表示读操作
+  40   1          I2C_MasterSendData(devAddr | 0x01);  // 发送设备地址
+  41   1          I2C_MasterRxAck();  // 接收应答信号
+  42   1          while(size--)  // 循环接收数据
+  43   1          {
+  44   2              I2C_SendMasterCmd(I2C_MasterCmd_Recv);  // I2C主设备接收命令
+  45   2              *buf++ = I2CRXD;  // 读取数据
+  46   2              if (size == 0)  // 如果是最后一位数据，发送NACK
+  47   2              {
+  48   3                  I2C_MasterNAck();
+  49   3              }
+  50   2              else  // 如果不是最后一位数据，发送ACK
+  51   2              {
+  52   3                  I2C_MasterAck();
+  53   3              }
+  54   2          }
+C51 COMPILER V9.60.7.0   FW_I2C                                                            07/31/2023 14:33:30 PAGE 2   
+
+  55   1          I2C_MasterStop();  // I2C主设备停止信号
+  56   1          SFRX_OFF();  // 关闭特殊功能寄存器的交换功能
+  57   1          return HAL_OK;  // 返回操作成功状态
+  58   1      }
+  59          
+  60          // 定义16位地址的I2C写入函数
+  61          // devAddr: 设备地址
+  62          // memAddr: 存储器地址
+  63          // dat: 数据
+  64          // size: 数据大小
+  65          uint8_t I2C_Write16BitAddr(uint8_t devAddr, uint16_t memAddr, uint8_t *dat, uint16_t size)
+  66          {
+  67   1          // 其实这里和I2C_Write类似，区别在于地址是16位，所以需要发送两次
+  68   1          // 具体的解析和注释与上面的I2C_Write类似，不再赘述
+  69   1                      SFRX_ON();
+  70   1          I2C_MasterStart();
+  71   1          I2C_MasterSendData(devAddr & 0xFE);
+  72   1          I2C_MasterRxAck();
+  73   1          I2C_MasterSendData(memAddr >> 8);
+  74   1          I2C_MasterRxAck();
+  75   1          I2C_MasterSendData(memAddr & 0xFF);
+  76   1          I2C_MasterRxAck();
+  77   1          while(size--)
+  78   1          {
+  79   2              I2C_MasterSendData(*dat++);
+  80   2              I2C_MasterRxAck();
+  81   2          }
+  82   1          I2C_MasterStop();
+  83   1          SFRX_OFF();
+  84   1          return HAL_OK;
+  85   1      }
+  86          
+  87          // 定义16位地址的I2C读取函数
+  88          // devAddr: 设备地址
+  89          // memAddr: 存储器地址
+  90          // buf: 数据缓存
+  91          // size: 数据大小
+  92          uint8_t I2C_Read16BitAddr(uint8_t devAddr, uint16_t memAddr, uint8_t *buf, uint16_t size)
+  93          {
+  94   1          // 这里和I2C_Read类似，区别在于地址是16位，所以需要发送两次
+  95   1          // 具体的解析和注释与上面的I2C_Read类似，不再赘述
+  96   1                      SFRX_ON();
+  97   1          I2C_MasterStart();
+  98   1          I2C_MasterSendData(devAddr & 0xFE);
+  99   1          I2C_MasterRxAck();
+ 100   1          I2C_MasterSendData(memAddr >> 8);
+ 101   1          I2C_MasterRxAck();
+ 102   1          I2C_MasterSendData(memAddr & 0xFF);
+ 103   1          I2C_MasterRxAck();
+ 104   1          I2C_MasterStart();
+ 105   1          I2C_MasterSendData(devAddr | 0x01);
+ 106   1          I2C_MasterRxAck();
+ 107   1          while(size--)
+ 108   1          {
+ 109   2              I2C_SendMasterCmd(I2C_MasterCmd_Recv);
+ 110   2              *buf++ = I2CRXD;
+ 111   2              if (size == 0)
+ 112   2              {
+ 113   3                  I2C_MasterNAck();
+ 114   3              }
+ 115   2              else
+ 116   2              {
+C51 COMPILER V9.60.7.0   FW_I2C                                                            07/31/2023 14:33:30 PAGE 3   
+
+ 117   3                  I2C_MasterAck();
+ 118   3              }
+ 119   2          }
+ 120   1          I2C_MasterStop();
+ 121   1          SFRX_OFF();
+ 122   1          return HAL_OK;
+ 123   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1239    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      30
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

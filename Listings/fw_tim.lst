@@ -1,0 +1,145 @@
+C51 COMPILER V9.60.7.0   FW_TIM                                                            07/31/2023 14:33:30 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE FW_TIM
+OBJECT MODULE PLACED IN .\Objects\fw_tim.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE src\fw_tim.c LARGE OMF2 OPTIMIZE(8,SPEED) BROWSE INCDIR(.\include) DEBUG
+                    - PRINT(.\Listings\fw_tim.lst) OBJECT(.\Objects\fw_tim.obj)
+
+line level    source
+
+   1          // Copyright 2021 IOsetting <iosetting(at)outlook.com>
+   2          //
+   3          // 根据Apache License 2.0协议授权
+   4          
+   5          #include "fw_tim.h" // 包含计时器相关的头文件
+   6          #include "fw_sys.h" // 包含系统相关的头文件
+   7          #include "fw_util.h" // 包含实用工具的头文件
+   8          
+   9          /**
+  10           * 计算 Timer0 和 Timer1 计数器的初始值
+  11           * - 如果频率过高，将返回 `limit` 的值，计时器将以最高频率运行
+  12           * - 如果频率过低，将返回 0，计时器将以最低可能频率运行
+  13          */
+  14          int16_t TIM_Timer0n1_CalculateInitValue(uint16_t frequency, HAL_State_t freq1t, uint16_t limit)
+  15          {
+  16   1          uint32_t value = __SYSCLOCK; // 获取系统时钟值
+  17   1          if (!freq1t)
+  18   1              value = value / 12; // 如果 freq1t 为0，那么将 value 除以 12
+  19   1          value = value / frequency; // 将 value 除以频率
+  20   1          if (value > limit)
+  21   1              return 0; // 如果 value 大于上限，则返回 0
+  22   1          else
+  23   1              return limit - value; // 否则返回上限减去 value 的值
+  24   1      }
+  25          
+  26          // 配置 Timer0 的函数
+  27          void TIM_Timer0_Config(HAL_State_t freq1t, TIM_TimerMode_t mode, uint16_t frequency)
+  28          {
+  29   1          uint16_t init;
+  30   1          TIM_Timer0_Set1TMode(freq1t); // 设置 Timer0 的 1T 模式
+  31   1          TIM_Timer0_SetMode(mode); // 设置 Timer0 的模式
+  32   1          if (mode == TIM_TimerMode_8BitAuto) // 如果模式为 8 位自动模式
+  33   1          {
+  34   2              init = TIM_Timer0n1_CalculateInitValue(frequency, freq1t, 0xFF); // 计算初始值
+  35   2              TIM_Timer0_SetInitValue(init & 0xFF, init & 0xFF); // 设置 Timer0 的初始值
+  36   2          }
+  37   1          else // 如果模式不是 8 位自动模式
+  38   1          {
+  39   2              init = TIM_Timer0n1_CalculateInitValue(frequency, freq1t, 0xFFFF); // 计算初始值
+  40   2              TIM_Timer0_SetInitValue(init >> 8, init & 0xFF); // 设置 Timer0 的初始值
+  41   2          }
+  42   1      }
+  43          
+  44          // 配置 Timer1 的函数
+  45          void TIM_Timer1_Config(HAL_State_t freq1t, TIM_TimerMode_t mode, uint16_t frequency)
+  46          {
+  47   1          uint16_t init;
+  48   1          TIM_Timer1_Set1TMode(freq1t); // 设置 Timer1 的 1T 模式
+  49   1          TIM_Timer1_SetMode(mode); // 设置 Timer1 的模式
+  50   1          if (mode == TIM_TimerMode_8BitAuto) // 如果模式为 8 位自动模式
+  51   1          {
+  52   2              init = TIM_Timer0n1_CalculateInitValue(frequency, freq1t, 0xFF); // 计算初始值
+  53   2              TIM_Timer1_SetInitValue(init & 0xFF, init & 0xFF); // 设置 Timer1 的初始值
+  54   2          }
+C51 COMPILER V9.60.7.0   FW_TIM                                                            07/31/2023 14:33:30 PAGE 2   
+
+  55   1          else // 如果模式不是 8 位自动模式
+  56   1          {
+  57   2              init = TIM_Timer0n1_CalculateInitValue(frequency, freq1t, 0xFFFF); // 计算初始值
+  58   2              TIM_Timer1_SetInitValue(init >> 8, init & 0xFF); // 设置 Timer1 的初始值
+  59   2          }
+  60   1      }
+  61          
+  62          // 计算 Timer2, Timer3, Timer4 的初始值的函数
+  63          int16_t _TIM_Timer234_InitValueCalculate(
+  64              uint16_t frequency, uint8_t prescaler, HAL_State_t freq1t)
+  65          {
+  66   1          uint32_t value = __SYSCLOCK; // 获取系统时钟值
+  67   1          if (!freq1t)
+  68   1              value = value / 12; // 如果 freq1t 为0，那么将 value 除以 12
+  69   1          value = value / ((prescaler + 1) * frequency); // 将 value 除以 prescaler+1 和 frequency 的乘积
+  70   1      
+  71   1          if (value > 0xFFFF)
+  72   1              return 0; // 如果 value 大于 0xFFFF，则返回 0
+  73   1          else
+  74   1              return 0xFFFF - value; // 否则返回 0xFFFF 减去 value 的值
+  75   1      }
+  76          
+  77          /**
+  78           * Timer2,3,4 的配置
+  79           * 
+  80           * 1. 没有中断优先级
+  81           * 2. 频率 = SYSCLK / (TMxPS + 1) / (0xFFFF - TxH,TxL) / (1T? 1 : 12)
+  82          */
+  83          
+  84          // 配置 Timer2 的函数
+  85          void TIM_Timer2_Config(HAL_State_t freq1t, uint8_t prescaler, uint16_t frequency)
+  86          {
+  87   1          uint16_t init = _TIM_Timer234_InitValueCalculate(frequency, prescaler, freq1t); // 计算初始值
+  88   1          TIM_Timer2_Set1TMode(freq1t); // 设置 Timer2 的 1T 模式
+  89   1          TIM_Timer2_SetPreScaler(prescaler); // 设置 Timer2 的预分频值
+  90   1          TIM_Timer2_SetInitValue(init >> 8, init & 0xFF); // 设置 Timer2 的初始值
+  91   1      }
+  92          
+  93          // 配置 Timer3 的函数
+  94          void TIM_Timer3_Config(
+  95              HAL_State_t freq1t, uint8_t prescaler, uint16_t frequency, HAL_State_t intState)
+  96          {
+  97   1          uint16_t init = _TIM_Timer234_InitValueCalculate(frequency, prescaler, freq1t); // 计算初始值
+  98   1          TIM_Timer3_Set1TMode(freq1t); // 设置 Timer3 的 1T 模式
+  99   1          TIM_Timer3_SetPreScaler(prescaler); // 设置 Timer3 的预分频值
+ 100   1          TIM_Timer3_SetInitValue(init >> 8, init & 0xFF); // 设置 Timer3 的初始值
+ 101   1          EXTI_Timer3_SetIntState(intState); // 设置 Timer3 的中断状态
+ 102   1      }
+ 103          
+ 104          // 配置 Timer4 的函数
+ 105          void TIM_Timer4_Config(
+ 106              HAL_State_t freq1t, uint8_t prescaler, uint16_t frequency, HAL_State_t intState)
+ 107          {
+ 108   1          uint16_t init = _TIM_Timer234_InitValueCalculate(frequency, prescaler, freq1t); // 计算初始值
+ 109   1          TIM_Timer4_Set1TMode(freq1t); // 设置 Timer4 的 1T 模式
+ 110   1          TIM_Timer4_SetPreScaler(prescaler); // 设置 Timer4 的预分频值
+ 111   1          TIM_Timer4_SetInitValue(init >> 8, init & 0xFF); // 设置 Timer4 的初始值
+ 112   1          EXTI_Timer4_SetIntState(intState); // 设置 Timer4 的中断状态
+ 113   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+C51 COMPILER V9.60.7.0   FW_TIM                                                            07/31/2023 14:33:30 PAGE 3   
+
+   CODE SIZE        =    752    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      37
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
